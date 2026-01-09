@@ -1,0 +1,16 @@
+{
+  "name": "historic-pub-crawler-api",
+  "version": "1.0.0",
+  "description": "Backend API for Historic Pub Crawler with caching",
+  "main": "api/places.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": ">=14.x"
+  }
+}
