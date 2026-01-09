@@ -642,7 +642,48 @@ async function findPubs(center, radius, filter) {
             });
         }
 
-        window.initGoogleMapsCallback = () => { window.googleMapsLoaded = true; initializeGoogleMaps(); initializeAutocomplete(); };
+// 1. Define the Callback that Google Maps will run when loaded
+        window.initGoogleMapsCallback = () => { 
+            console.log("Google Maps Loaded Successfully");
+            window.googleMapsLoaded = true; 
+            initializeGoogleMaps(); 
+            initializeAutocomplete(); 
+        };
+
+        // 2. Dynamic Loader Function
+        async function loadGoogleMapsScript() {
+            if (window.googleMapsLoaded) return;
+
+            try {
+                // Fetch the key from your secure backend
+                const res = await fetch('/api/get-maps-key');
+                if (!res.ok) throw new Error('Failed to fetch API Key');
+                
+                const data = await res.json();
+                
+                // Create the script tag dynamically
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${data.apiKey}&libraries=places,geometry&callback=initGoogleMapsCallback`;
+                script.async = true;
+                script.defer = true;
+                
+                // Inject it into the page
+                document.head.appendChild(script);
+                
+                const status = document.getElementById('api-status');
+                if(status) status.innerHTML = '<span style="color:#137333;">✓ Connected</span>';
+
+            } catch (error) {
+                console.error("Map Load Error:", error);
+                const status = document.getElementById('api-status');
+                if(status) status.innerHTML = '<span style="color:#d93025;">⚠ Connection Failed</span>';
+            }
+        }
+
+        // 3. Trigger the load when the page is ready
+        document.addEventListener('DOMContentLoaded', loadGoogleMapsScript);
+
+        // ... (Keep your existing UI event listeners below) ...
         document.getElementById('modal-close').onclick = () => document.getElementById('pub-modal').style.display = 'none';
         document.getElementById('search-form').onsubmit = (e) => {
             e.preventDefault();
@@ -650,6 +691,7 @@ async function findPubs(center, radius, filter) {
             searchPubs(fd.get('location'), fd.get('num-pubs'), fd.get('historic-filter'), fd.get('max-distance'), parseFloat(fd.get('min-rating')), fd.get('open-now') === 'true', fd.get('sort-preference'));
         };
     </script>
+
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-check-compat.js"></script>
