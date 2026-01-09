@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Pub Crawl Planner</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍺</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Google Sans', 'Roboto', Arial, sans-serif; 
+            background: #f8f9fa;
+            min-height: 100vh; 
+            color: #202124; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header { 
+            position: absolute; 
+            top: 0; left: 0; right: 0; 
+            background: #fff; 
+            padding: 16px 24px; 
+            border-bottom: 1px solid #dadce0; 
+            display: flex; 
+            align-items: center; 
+            gap: 16px;
+        }
+        .app-title { font-size: 18px; color: #5f6368; font-weight: 400; }
+
+        .login-container { width: 100%; max-width: 450px; padding: 20px; }
+
+        .login-card {
+            background: white;
+            padding: 48px 40px 36px;
+            border-radius: 8px;
+            border: 1px solid #dadce0;
+            box-shadow: 0 1px 3px rgba(60,64,67,.15);
+            text-align: center;
+        }
+
+        h1 { color: #202124; margin-bottom: 8px; font-size: 24px; font-weight: 400; }
+        p { color: #5f6368; margin-bottom: 32px; font-size: 16px; line-height: 1.5; }
+
+        .btn-google {
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            width: 100%; padding: 10px 16px;
+            border: 1px solid #dadce0; border-radius: 4px;
+            background: white; color: #3c4043; font-weight: 500; font-size: 14px;
+            cursor: pointer; transition: background 0.2s; margin-bottom: 24px;
+        }
+        .btn-google:hover { background-color: #f8f9fa; border-color: #d2e3fc; }
+
+        .divider { display: flex; align-items: center; margin: 20px 0; color: #5f6368; font-size: 14px; }
+        .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid #dadce0; }
+        .divider span { padding: 0 10px; }
+
+        .form-group { margin-bottom: 16px; text-align: left; }
+        .form-group label { display: block; font-size: 14px; font-weight: 500; color: #3c4043; margin-bottom: 6px; }
+        .form-group input { width: 100%; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; color: #202124; }
+        .form-group input:focus { outline: none; border-color: #1a73e8; }
+
+        /* [RESTORED] ReCAPTCHA Style */
+        .recaptcha-container {
+            margin: 16px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            width: 100%; padding: 10px 24px;
+            background: #1a73e8; color: white;
+            border: none; border-radius: 4px; font-weight: 500; font-size: 14px;
+            cursor: pointer; margin-top: 10px;
+        }
+        .btn-primary:hover { background: #1557b0; }
+
+        .toggle-link { display: block; margin-top: 24px; color: #1a73e8; text-decoration: none; font-size: 14px; cursor: pointer; }
+        .toggle-link:hover { text-decoration: underline; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <span style="font-size: 22px;">🍺</span>
+        <div class="app-title">Pub Crawl Planner</div>
+    </div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div id="form-title-section">
+                <h1 id="page-title">Create Account</h1>
+                <p id="page-subtitle">Plan your perfect night out</p>
+            </div>
+
+            <button class="btn-google" onclick="window.loginWithGoogle()">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" height="18" alt="G">
+                Continue with Google
+            </button>
+
+            <div class="divider"><span>OR</span></div>
+
+            <form id="auth-form">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                
+                <div class="form-group" id="confirm-pass-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="confirm-password">
+                </div>
+
+                <div class="recaptcha-container">
+                    <div id="recaptcha-container"></div>
+                </div>
+
+                <button type="submit" class="btn-primary" id="submit-btn">Create Account</button>
+            </form>
+
+            <a class="toggle-link" id="toggle-mode" onclick="toggleLoginMode()">
+                Already have an account? Sign in
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let isSignUp = true;
+
+        function toggleLoginMode() {
+            isSignUp = !isSignUp;
+            const title = document.getElementById('page-title');
+            const confirmGroup = document.getElementById('confirm-pass-group');
+            const submitBtn = document.getElementById('submit-btn');
+            const toggleLink = document.getElementById('toggle-mode');
+
+            if (isSignUp) {
+                title.textContent = 'Create Account';
+                confirmGroup.classList.remove('hidden');
+                submitBtn.textContent = 'Create Account';
+                toggleLink.textContent = 'Already have an account? Sign in';
+            } else {
+                title.textContent = 'Welcome Back';
+                confirmGroup.classList.add('hidden');
+                submitBtn.textContent = 'Sign In';
+                toggleLink.textContent = 'New here? Create an account';
+            }
+        }
+
+        // Handle Email/Password Submission
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                if (isSignUp) {
+                    await firebase.auth().createUserWithEmailAndPassword(email, password);
+                } else {
+                    await firebase.auth().signInWithEmailAndPassword(email, password);
+                }
+                // Redirect handled by auth observer in auth.js
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+    </script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-check-compat.js"></script>
+    <script src="auth.js"></script>
+</body>
+</html>
