@@ -6,41 +6,27 @@
     <title>Pub Crawl Planner</title>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
-            background: #ffffff;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            margin: 0;
-            color: #202124;
-        }
-
+        body { font-family: 'Google Sans', 'Roboto', Arial, sans-serif; background: #ffffff; display: flex; flex-direction: column; min-height: 100vh; margin: 0; color: #202124; }
         .header { display: flex; justify-content: flex-end; align-items: center; padding: 20px 30px; height: 48px; }
         #user-profile { display: none; align-items: center; gap: 15px; font-size: 13px; color: #5f6368; }
         #user-name { font-weight: 500; color: #000; }
         .logout-btn { background: #1a73e8; color: white; border: 1px solid transparent; padding: 8px 24px; border-radius: 4px; font-weight: 500; cursor: pointer; font-family: 'Google Sans', sans-serif; transition: background 0.2s; }
         .logout-btn:hover { background: #1557b0; }
-
         .main-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: -80px; display: none; width: 100%; }
         .logo-area { text-align: center; margin-bottom: 30px; }
         .logo-icon { font-size: 64px; margin-bottom: 10px; display: block; }
         h1 { font-size: 40px; font-weight: 500; margin: 0; letter-spacing: -0.5px; color: #202124; }
         .subtitle { margin-top: 10px; color: #5f6368; font-size: 16px; }
-
         .action-container { display: flex; gap: 16px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
         .version-card { text-decoration: none; background: #f8f9fa; border: 1px solid #f8f9fa; border-radius: 8px; padding: 20px 30px; width: 260px; text-align: left; transition: all 0.2s ease; cursor: pointer; display: flex; flex-direction: column; gap: 8px; }
         .version-card:hover { background: #ffffff; border-color: #dadce0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
-        
         .card-title { font-family: 'Google Sans', sans-serif; font-size: 18px; font-weight: 500; display: flex; align-items: center; gap: 10px; }
         .card-desc { font-size: 13px; color: #5f6368; line-height: 1.5; }
         .tag { font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
-
         .google-card .card-title { color: #1a73e8; }
         .google-card .tag { background: #e8f0fe; color: #1967d2; border: 1px solid #d2e3fc; }
         .geo-card .card-title { color: #137333; }
         .geo-card .tag { background: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
-
         .footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f2f2f2; padding: 12px 30px; font-size: 13px; color: #70757a; border-top: 1px solid #dadce0; display: flex; justify-content: space-between; }
     </style>
 </head>
@@ -49,7 +35,7 @@
     <div class="header">
         <div id="user-profile">
             <span><span id="user-name"></span></span>
-            <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
+            <button class="logout-btn" onclick="signOut()">Sign Out</button>
         </div>
     </div>
 
@@ -66,7 +52,6 @@
                 <div class="card-desc">Rich data, star ratings, photos, and live opening hours.</div>
                 <div class="card-desc" style="margin-top:4px; font-weight:500;">Cost: $$ (or Eco Mode)</div>
             </a>
-
             <a href="index_geoapify.html" class="version-card geo-card">
                 <div class="card-title">🌍 Geoapify <span class="tag">Free Tier</span></div>
                 <div class="card-desc">Powered by OpenStreetMap. Great for simple routing.</div>
@@ -76,7 +61,7 @@
     </div>
 
     <div class="footer">
-        <span>v7.6 • UK Region</span>
+        <span>v7.7 • UK Region</span>
         <span>Settings</span>
     </div>
 
@@ -99,17 +84,6 @@
                 });
             }
         });
-
-        // ✅ FIXED: Explicitly defined Logout Function
-        function handleLogout() {
-            if (window.firebase) {
-                firebase.auth().signOut().then(() => {
-                    window.location.href = "login.html";
-                });
-            } else {
-                console.error("Firebase not loaded");
-            }
-        }
     </script>
 </body>
 </html>
