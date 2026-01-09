@@ -1,1 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pub Crawl Planner - Select Version</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+        h1 { color: #1a73e8; margin-bottom: 8px; }
+        p { color: #5f6368; margin-bottom: 30px; }
+        
+        .menu-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-decoration: none;
+            color: white;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-align: left;
+            position: relative;
+        }
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .menu-btn span {
+            display: block;
+            font-size: 12px;
+            font-weight: normal;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
 
+        .btn-google { background: #4285F4; } /* Google Blue */
+        .btn-geoapify { background: #34a853; } /* Green */
+        .btn-mapbox { background: #333333; }   /* Mapbox Black */
+
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div style="font-size: 40px; margin-bottom: 10px;">🍺</div>
+        <h1>Pub Crawl Planner</h1>
+        <p>Select a map provider to start routing:</p>
+
+        <a href="index_google.html" class="menu-btn btn-google">
+            📍 Google Maps Version
+            <span>Best Data, Ratings, Opening Hours. (Cost: $$)</span>
+        </a>
+
+        <a href="index_geoapify.html" class="menu-btn btn-geoapify">
+            🌍 Geoapify Version
+            <span>Budget Friendly. OpenStreetMap Data. (Cost: Free/$)</span>
+        </a>
+
+        <a href="index_mapbox.html" class="menu-btn btn-mapbox">
+            🗺️ Mapbox Version
+            <span>Smooth Visuals. Good Routing. (Cost: Free/$)</span>
+        </a>
+
+        <div class="footer">
+            v7.0 • Multi-Provider Build
+        </div>
+    </div>
+
+</body>
+</html>

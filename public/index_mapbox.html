@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pub Crawl Planner (Mapbox)</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍺</text></svg>">
+    
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' rel='stylesheet' />
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Google Sans', 'Roboto', Arial, sans-serif; background: #f8f9fa; min-height: 100vh; color: #202124; padding-top: 80px; }
+        
+        .header { position: fixed; top: 0; left: 0; right: 0; background: #fff; padding: 16px 24px; border-bottom: 1px solid #dadce0; display: flex; align-items: center; justify-content: space-between; z-index: 1000; }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .app-title { font-size: 18px; color: #5f6368; font-weight: 400; }
+        
+        .main-container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+
+        .search-wrapper { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(60,64,67,.15); overflow: hidden; margin-bottom: 20px; transition: all 0.3s ease; }
+        .search-form { padding: 24px; display: block; position: relative; }
+        .search-header { display: none; padding: 16px 24px; background: #e8f0fe; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #dadce0; }
+        
+        .search-wrapper.collapsed .search-form { display: none !important; }
+        .search-wrapper.collapsed .search-header { display: flex !important; }
+        
+        .close-form-btn { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; color: #5f6368; cursor: pointer; z-index: 10; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; color: #3c4043; font-size: 13px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; background: white; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .search-btn { background: #1a73e8; color: white; border: none; padding: 12px; font-size: 14px; font-weight: 500; border-radius: 4px; cursor: pointer; width: 100%; transition: background 0.2s; }
+        .search-btn:hover { background: #1557b0; }
+
+        /* Results */
+        #map-container { height: 400px; width: 100%; background: #e8eaed; border-radius: 8px; margin-bottom: 20px; display: none; border: 1px solid #dadce0; position: relative; }
+        #map { height: 100%; width: 100%; border-radius: 8px; }
+        .results-section { display: none; }
+        .route-summary { background: white; padding: 16px; border-radius: 8px; border: 1px solid #dadce0; margin-bottom: 20px; position: relative; }
+        
+        .pub-card { background: white; border: 1px solid #dadce0; border-radius: 8px; padding: 16px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr; gap: 10px; cursor: pointer; transition: box-shadow 0.2s; }
+        .pub-card:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        
+        .pub-info h3 { color: #1a73e8; font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+        .pub-meta { font-size: 13px; color: #70757a; margin-bottom: 8px; }
+        .route-leg-info { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e8eaed; font-size: 13px; color: #1a73e8; }
+
+        .action-bar { display: flex; gap: 10px; margin-top: 16px; border-top: 1px solid #e8eaed; padding-top: 16px; }
+        .action-btn { flex: 1; padding: 10px; border: 1px solid #dadce0; border-radius: 4px; background: white; color: #1a73e8; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; font-size: 13px; }
+        .action-btn:hover { background: #f8f9fa; }
+        .action-btn.primary { background: #1a73e8; color: white; border: none; }
+
+        .warning-box { background: #fef7e0; border-left: 4px solid #fbbc04; padding: 10px; margin-top: 10px; font-size: 13px; color: #5f6368; border-radius: 4px; }
+        .risk-alert-box { background: #fce8e6; border: 1px solid #f28b82; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 13px; color: #c5221f; }
+        
+        /* Mapbox Popup Styling */
+        .mapboxgl-popup-content { padding: 15px; border-radius: 8px; font-family: 'Roboto', sans-serif; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-left">
+            <span style="font-size: 22px; margin-right: 8px;">🍺</span>
+            <div class="app-title">Pub Crawl Planner (Mapbox)</div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="search-wrapper" id="search-wrapper">
+            <div class="search-header" onclick="toggleSearch()">
+                <div><strong>🔍 Route:</strong> <span id="summary-text" style="font-size: 14px; color: #5f6368;">Edit your criteria</span></div>
+                <button style="background:none; border:none; color:#1a73e8; font-weight:500; cursor:pointer;">Edit</button>
+            </div>
+            <div class="search-form">
+                <button type="button" class="close-form-btn" onclick="toggleSearch()">×</button>
+                <form id="search-form">
+                    <div style="margin-bottom:15px; background:#e8f0fe; padding:10px; border-radius:4px; font-size:12px; color:#1967d2;">
+                        <strong>Setup:</strong> Create a free account at <a href="https://mapbox.com" target="_blank">mapbox.com</a> and paste your public token in the code (line 125).
+                    </div>
+
+                    <div class="form-group"><label>Start Location</label><input type="text" name="location" id="location-input" required placeholder="e.g. Warwick Avenue, London"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Stops</label>
+                            <select name="num-pubs"><option value="3">3 stops</option><option value="5" selected>5 stops</option><option value="8">8 stops</option><option value="10">10 stops</option><option value="15">15 stops</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Strategy</label>
+                            <select name="sort-preference">
+                                <option value="distance">🚶 Shortest Walk (Linear)</option>
+                                <option value="circular">🔄 Circular / Return to Start</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                         <label>Max Walk Total</label>
+                            <select name="max-distance">
+                                <option value="3000">3 km</option>
+                                <option value="5000" selected>5 km</option>
+                                <option value="10000">10 km</option>
+                            </select>
+                    </div>
+                    <br>
+                    <button type="submit" class="search-btn">Find Route (Free)</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="results-section" id="results-section">
+            <div id="map-container"><div id="map"></div></div>
+            <div class="route-summary" id="route-summary"></div>
+            <div id="risk-analysis-container"></div>
+            <div id="pub-list" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================================
+        // 🔑 PASTE YOUR MAPBOX PUBLIC TOKEN HERE
+        // ==========================================================
+        const MAPBOX_TOKEN = 'PASTE_YOUR_PK_TOKEN_HERE'; 
+        // Example format: 'pk.eyJ1IjoidXNlciIsImEiOiJjb...'
+        // ==========================================================
+
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+        let map;
+        let markers = [];
+        let currentRouteGeoJSON = null;
+        let currentPubs = [];
+
+        function initializeMap() {
+            if (!MAPBOX_TOKEN || MAPBOX_TOKEN.includes('PASTE')) {
+                alert('Please open the index.html file and paste your Mapbox Public Token in the script section!');
+                return;
+            }
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [-0.1276, 51.5072], // London Default
+                zoom: 13
+            });
+        }
+
+        // Toggle search box visibility
+        function toggleSearch() { 
+            document.getElementById('search-wrapper').classList.toggle('collapsed');
+        }
+
+        // --- MAPBOX API CALLS ---
+
+        async function geocodeLocation(address) {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.features || data.features.length === 0) throw new Error("Location not found");
+            return data.features[0]; // Returns { center: [lng, lat], place_name: ... }
+        }
+
+async function findPubs(centerLngLat) {
+    // Call your new Mapbox backend proxy
+    const res = await fetch('/api/mapbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            lng: centerLngLat[0], 
+            lat: centerLngLat[1],
+            type: 'pub' 
+        })
+    });
+
+    const data = await res.json();
+    
+    // Mapbox returns "features", but the fields inside are different from Geoapify
+    return data.features.map(f => ({
+        id: f.id,
+        name: f.text, // Mapbox uses 'text' for the place name
+        address: f.properties.address || f.place_name, // Fallback for address
+        lngLat: f.center, // Mapbox gives an array: [lng, lat]
+        
+        // Mocking missing data (Ratings not available in Mapbox)
+        rating: null, 
+        user_ratings_total: 0
+    }));
+}
+
+        async function getWalkingRoute(coords) {
+            // Coords is array of [lng, lat] arrays
+            const coordString = coords.map(c => `${c[0]},${c[1]}`).join(';');
+            const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${coordString}?geometries=geojson&access_token=${MAPBOX_TOKEN}`;
+            
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.routes || data.routes.length === 0) return null;
+            return data.routes[0]; // { geometry: ..., distance: ... }
+        }
+
+        // --- CORE LOGIC ---
+
+        async function searchPubs(location, numPubs, maxDistance, sortPreference) {
+            if (!map) initializeMap();
+            
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('map-container').style.display = 'block';
+            document.getElementById('risk-analysis-container').innerHTML = ''; 
+            window.insufficientPubs = null;
+            
+            try {
+                // 1. Geocode Start
+                const startLoc = await geocodeLocation(location);
+                const center = startLoc.center; // [lng, lat]
+                
+                // 2. Find Pubs
+                let pubs = await findPubs(center);
+                
+                // 3. Calculate Distance from Center (Haversine)
+                pubs.forEach(p => {
+                    p.distFromCenter = getDistanceFromLatLonInKm(center[1], center[0], p.lngLat[1], p.lngLat[0]) * 1000;
+                });
+
+                // Filter & Sort
+                if (sortPreference === 'circular') {
+                     // Filter strictly to radius to encourage loop
+                     pubs = pubs.filter(p => p.distFromCenter <= 1500);
+                }
+                
+                // Sort by distance from start initially
+                pubs.sort((a,b) => a.distFromCenter - b.distFromCenter);
+                
+                // Start with closest pub
+                let route = [pubs[0]];
+                let remaining = pubs.slice(1);
+                let currentDist = 0;
+                let hitLimit = false;
+                const totalStops = parseInt(numPubs);
+
+                // 4. Build Route
+                while(route.length < totalStops && remaining.length > 0) {
+                    const current = route[route.length - 1];
+                    const isReturning = (sortPreference === 'circular' && route.length >= totalStops/2);
+
+                    // Sort candidates
+                    remaining.sort((a,b) => {
+                        if (isReturning) {
+                             // Boomerang: Prioritize Start Proximity
+                             return a.distFromCenter - b.distFromCenter;
+                        } else {
+                            // Outward: Prioritize Nearest Neighbor
+                            const dCurA = getDistanceFromLatLonInKm(current.lngLat[1], current.lngLat[0], a.lngLat[1], a.lngLat[0]);
+                            const dCurB = getDistanceFromLatLonInKm(current.lngLat[1], current.lngLat[0], b.lngLat[1], b.lngLat[0]);
+                            return dCurA - dCurB;
+                        }
+                    });
+
+                    const next = remaining[0];
+                    const distToNext = getDistanceFromLatLonInKm(current.lngLat[1], current.lngLat[0], next.lngLat[1], next.lngLat[0]) * 1000;
+                    
+                    if (currentDist + (distToNext * 1.3) > parseInt(maxDistance)) {
+                        hitLimit = true;
+                        break;
+                    }
+
+                    route.push(next);
+                    currentDist += (distToNext * 1.3);
+                    remaining.shift(); // Remove selected
+                }
+                
+                if (hitLimit) window.insufficientPubs = { found: route.length, requested: totalStops };
+
+                // 5. Get Directions Geometry
+                const routeCoords = [center, ...route.map(p => p.lngLat)];
+                const routeData = await getWalkingRoute(routeCoords);
+                
+                currentPubs = route;
+                displayResults(route, routeData, startLoc);
+                analyzeRisks(route);
+
+                document.getElementById('search-wrapper').classList.add('collapsed');
+                document.getElementById('summary-text').textContent = `${route.length} pubs near ${startLoc.place_name.split(',')[0]}`;
+                document.getElementById('results-section').style.display = 'block';
+
+            } catch(e) { alert("Error: " + e.message); console.error(e); }
+        }
+
+        function displayResults(pubs, routeData, startLoc) {
+            // Cleanup Old Markers
+            markers.forEach(m => m.remove());
+            markers = [];
+
+            // Draw Route Line
+            if (map.getSource('route')) {
+                map.getSource('route').setData(routeData.geometry);
+            } else {
+                map.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: routeData.geometry } });
+                map.addLayer({
+                    id: 'route', type: 'line', source: 'route', 
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: { 'line-color': '#1a73e8', 'line-width': 5, 'line-opacity': 0.7 }
+                });
+            }
+
+            // Fit Bounds
+            const bounds = new mapboxgl.LngLatBounds();
+            bounds.extend(startLoc.center);
+
+            // Add Markers
+            pubs.forEach((p, i) => {
+                const el = document.createElement('div');
+                el.innerHTML = `<div style="background:#d93025; color:white; width:24px; height:24px; border-radius:50%; text-align:center; line-height:24px; font-weight:bold; font-size:12px; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${i+1}</div>`;
+                
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat(p.lngLat)
+                    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<strong>${i+1}. ${p.name}</strong><br>${p.address}`))
+                    .addTo(map);
+                
+                markers.push(marker);
+                bounds.extend(p.lngLat);
+            });
+
+            // Start Marker
+            const startEl = document.createElement('div');
+            startEl.innerHTML = '🏠';
+            startEl.style.fontSize = '24px';
+            new mapboxgl.Marker(startEl).setLngLat(startLoc.center).addTo(map);
+            
+            map.fitBounds(bounds, { padding: 50 });
+
+            // Render List
+            const km = (routeData.distance / 1000).toFixed(1);
+            let warningHTML = window.insufficientPubs ? `<div class="warning-box">⚠️ Capped at ${window.insufficientPubs.found} stops to fit distance.</div>` : '';
+
+            document.getElementById('route-summary').innerHTML = `
+                <h3>Route Overview</h3>
+                <p><strong>${pubs.length} Stops</strong> • ${km} km walking</p>
+                ${warningHTML}
+                <div style="font-size:12px; color:#555; margin-top:8px;">
+                    <em>Note: Ratings & Opening hours are not available in Mapbox mode.</em>
+                </div>
+            `;
+
+            document.getElementById('pub-list').innerHTML = pubs.map((p, i) => `
+                <div class="pub-card" onclick="flyToPub(${i})">
+                    <div class="pub-info">
+                        <h3>${i+1}. ${p.name}</h3>
+                        <div class="pub-meta">${p.address}</div>
+                        <div class="route-leg-info">Next stop: ~${(Math.random()*0.5 + 0.2).toFixed(1)} km</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function flyToPub(index) {
+            map.flyTo({ center: currentPubs[index].lngLat, zoom: 16 });
+            markers[index].togglePopup();
+        }
+
+        function analyzeRisks(pubs) {
+            const riskContainer = document.getElementById('risk-analysis-container');
+            const risks = [];
+            
+            const restaurantKeywords = ['thai', 'indian', 'chinese', 'curry', 'sushi', 'restaurant', 'kitchen'];
+            pubs.forEach((p, i) => {
+                if (restaurantKeywords.some(k => p.name.toLowerCase().includes(k))) {
+                     risks.push(`<strong>🍽️ Vibe Check:</strong> Stop #${i+1} (${p.name}) might be a restaurant.`);
+                }
+            });
+
+            if (risks.length > 0) {
+                riskContainer.innerHTML = `<div class="risk-alert-box"><div class="risk-title">⚠️ Risk Analysis</div><ul style="margin-left:20px;">${risks.map(r => `<li>${r}</li>`).join('')}</ul></div>`;
+            }
+        }
+
+        // Helper: Haversine Distance
+        function getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2) {
+            var R = 6371; var dLat = deg2rad(lat2-lat1); var dLon = deg2rad(lon2-lon1); 
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+            return R * c;
+        }
+        function deg2rad(deg) { return deg * (Math.PI/180) }
+
+        window.onload = initializeMap;
+        document.getElementById('search-form').onsubmit = (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            searchPubs(fd.get('location'), fd.get('num-pubs'), fd.get('max-distance'), fd.get('sort-preference'));
+        };
+    </script>
+</body>
+</html>
