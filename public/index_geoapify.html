@@ -257,12 +257,26 @@
             document.getElementById('results-section').style.display = 'none';
 
             try {
-                // A. Geocode
+                // A. Geocode Start Location
                 const geoRes = await fetch('/api/geoapify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ type: 'geocode', text: location })
                 });
+
+                // --- NEW ERROR HANDLING ---
+                // Check if the server returned HTML (error page) instead of JSON
+                const contentType = geoRes.headers.get("content-type");
+                if (!geoRes.ok) {
+                    throw new Error(`Server Error: ${geoRes.status} ${geoRes.statusText}`);
+                }
+                if (!contentType || !contentType.includes("application/json")) {
+                    const text = await geoRes.text();
+                    console.error("Server returned non-JSON:", text);
+                    throw new Error("Server returned an HTML error instead of data. Check your Vercel logs.");
+                }
+                // ---------------------------
+
                 const geoData = await geoRes.json();
                 
                 if (!geoData.features || geoData.features.length === 0) throw new Error("Location not found");
