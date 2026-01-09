@@ -13,7 +13,43 @@
             justify-content: center;
             min-height: 100vh;
             margin: 0;
+            position: relative; /* Needed for top-right positioning */
         }
+
+        /* --- User Profile (Top Right) --- */
+        #user-profile {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 14px;
+            color: #333;
+            display: flex; /* Hidden by default until auth checks out */
+            align-items: center;
+            gap: 10px;
+            opacity: 0; /* Fade in effect */
+            transition: opacity 0.5s;
+        }
+
+        #user-profile strong {
+            color: #1a73e8;
+        }
+
+        #logout-btn {
+            background: #f44336; /* Red for logout */
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        #logout-btn:hover { background: #d32f2f; }
+
+        /* --- Main Container --- */
         .container {
             text-align: center;
             background: white;
@@ -22,7 +58,9 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             max-width: 400px;
             width: 90%;
+            display: none; /* 🔒 HIDDEN by default until login confirmed */
         }
+
         h1 { color: #1a73e8; margin-bottom: 8px; }
         p { color: #5f6368; margin-bottom: 30px; }
         
@@ -51,9 +89,8 @@
             margin-top: 4px;
         }
 
-        .btn-google { background: #4285F4; } /* Google Blue */
-        .btn-geoapify { background: #34a853; } /* Green */
-        .btn-mapbox { background: #333333; }   /* Mapbox Black */
+        .btn-google { background: #4285F4; }
+        .btn-geoapify { background: #34a853; }
 
         .footer {
             margin-top: 20px;
@@ -64,7 +101,12 @@
 </head>
 <body>
 
-    <div class="container">
+    <div id="user-profile">
+        <span>Hello, <strong id="user-name">User</strong></span>
+        <button id="logout-btn" onclick="handleLogout()">Logout</button>
+    </div>
+
+    <div class="container" id="main-content">
         <div style="font-size: 40px; margin-bottom: 10px;">🍺</div>
         <h1>Pub Crawl Planner</h1>
         <p>Select a map provider to start routing:</p>
@@ -80,9 +122,49 @@
         </a>
 
         <div class="footer">
-            v7.0 • Multi-Provider Build
+            v7.3 • Multi-Provider Build
         </div>
     </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    
+    <script src="auth.js"></script> 
+
+    <script>
+        // Gatekeeper Logic
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // Wait for Firebase to initialize (auth.js should handle init)
+            // We use a small timeout or listen to the observer directly
+            
+            firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    // ✅ User is Logged In
+                    console.log("User detected:", user.email);
+                    
+                    // 1. Show the user name
+                    const name = user.email.split('@')[0]; // Extract "mark" from "mark@gmail.com"
+                    document.getElementById('user-name').innerText = name;
+                    
+                    // 2. Reveal the UI
+                    document.getElementById('user-profile').style.opacity = '1';
+                    document.getElementById('main-content').style.display = 'block';
+
+                } else {
+                    // ❌ User is NOT Logged In
+                    console.log("No user. Redirecting to login...");
+                    window.location.href = "login.html";
+                }
+            });
+        });
+
+        function handleLogout() {
+            firebase.auth().signOut().then(() => {
+                window.location.href = "login.html";
+            });
+        }
+    </script>
 
 </body>
 </html>
