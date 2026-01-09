@@ -35,7 +35,7 @@
     <div class="header">
         <div id="user-profile">
             <span><span id="user-name"></span></span>
-            <button class="logout-btn" onclick="signOut()">Sign Out</button>
+            <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
         </div>
     </div>
 
@@ -61,7 +61,7 @@
     </div>
 
     <div class="footer">
-        <span>v7.7 • UK Region</span>
+        <span>v7.8 • UK Region</span>
         <span>Settings</span>
     </div>
 
@@ -84,6 +84,21 @@
                 });
             }
         });
+
+        // 2. FIXED: Explicit logout function (Bulletproof)
+        function handleLogout() {
+            if (window.firebase) {
+                firebase.auth().signOut().then(() => {
+                    console.log("Signed out successfully");
+                    window.location.href = "login.html";
+                }).catch((error) => {
+                    console.error("Sign Out Error:", error);
+                });
+            } else {
+                console.error("Firebase not loaded");
+                window.location.href = "login.html"; // Fallback
+            }
+        }
     </script>
 </body>
 </html>
