@@ -34,6 +34,11 @@
         
         .pub-list { list-style: none; padding: 0; }
         .pub-item { background: white; border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #34a853; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Links */
+        .pub-link { text-decoration: none; color: #1a73e8; font-weight: bold; font-size: 16px; }
+        .pub-link:hover { text-decoration: underline; color: #1557b0; }
+
         .pub-details h3 { margin: 0 0 5px 0; font-size: 16px; color: #333; }
         .pub-address { font-size: 13px; color: #666; }
         .pub-meta { font-size: 12px; margin-top: 5px; color: #888; display: flex; align-items: center; gap: 8px;}
@@ -96,35 +101,27 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     
-    <script>
-        // 1. Sanity Check
-        console.log("Geoapify Page Loaded");
+    <script src="auth.js"></script>
 
+    <script>
+        // 1. Init
+        console.log("Geoapify Page Loaded");
         let map = null;
         let markersGroup = null;
         let routeLayer = null;
 
-        // 2. Auth Logic (Inline fallback if auth.js is missing)
+        // 2. Auth Logic (Handled by auth.js mostly, but UI updates here)
         document.addEventListener('DOMContentLoaded', () => {
             if (window.firebase) {
-                // Initialize if needed, or rely on existing init
-                try {
-                   // Paste your firebase config here if auth.js is permanently gone
-                   // Otherwise, uncomment the script tag above when auth.js is fixed
-                   firebase.auth().onAuthStateChanged((user) => {
-                        if (user) {
-                            const name = user.email.split('@')[0];
-                            document.getElementById('user-name').innerText = name;
-                            document.getElementById('user-profile').style.display = 'flex';
-                        }
-                    });
-                } catch(e) { console.log("Firebase auth check failed", e); }
+                 firebase.auth().onAuthStateChanged((user) => {
+                    if (user) {
+                        const name = user.email.split('@')[0];
+                        document.getElementById('user-name').innerText = name;
+                        document.getElementById('user-profile').style.display = 'flex';
+                    }
+                });
             }
         });
-
-        function handleLogout() {
-            if (window.firebase) firebase.auth().signOut().then(() => window.location.href = "login.html");
-        }
 
         // 3. UI Logic
         function toggleSearch() {
@@ -140,6 +137,7 @@
             }
         }
 
+        // 4. Map Logic
         function initMap() {
             if (map) return;
             map = L.map('map').setView([51.505, -0.09], 13);
@@ -150,10 +148,9 @@
             markersGroup = L.layerGroup().addTo(map);
         }
 
-        // 4. Main Search Logic
+        // 5. Search Logic
         document.getElementById('search-form').onsubmit = async (e) => {
-            console.log("Submit clicked");
-            e.preventDefault(); // STOP PAGE RELOAD
+            e.preventDefault();
             
             const fd = new FormData(e.target);
             const location = fd.get('location');
@@ -166,27 +163,18 @@
 
             try {
                 // A. Geocode
-                console.log("Fetching geocode...");
                 const geoRes = await fetch('/api/geoapify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ type: 'geocode', text: location })
                 });
 
-                // Check for HTML error response
-                const contentType = geoRes.headers.get("content-type");
-                if (!geoRes.ok || (contentType && !contentType.includes("application/json"))) {
-                    const text = await geoRes.text();
-                    console.error("Backend Error:", text);
-                    throw new Error("Server Error. Check console.");
-                }
-
+                if (!geoRes.ok) throw new Error("Server Error");
                 const geoData = await geoRes.json();
                 if (!geoData.features || geoData.features.length === 0) throw new Error("Location not found");
                 const startCoords = geoData.features[0].properties;
 
                 // B. Find Pubs
-                console.log("Fetching pubs...");
                 const placesRes = await fetch('/api/geoapify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -254,6 +242,7 @@
             markersGroup.clearLayers();
             if (routeLayer) map.removeLayer(routeLayer);
 
+            // Add Start Marker
             L.marker([startLocation.lat, startLocation.lon]).bindPopup(`<strong>Start:</strong> ${startLocation.formatted}`).addTo(markersGroup);
 
             const latlngs = [[startLocation.lat, startLocation.lon]];
@@ -267,7 +256,17 @@
                 const badges = formatCategories(p.categories);
                 const li = document.createElement('li');
                 li.className = 'pub-item';
-                li.innerHTML = `<div class="pub-details"><h3>${index+1}. ${p.name}</h3><div class="pub-meta">${badges}<span class="distance-tag">📍 ${p.legDistance.toFixed(2)} km walk</span></div><div class="pub-address">${p.address}</div></div><div style="font-size:20px;">🍺</div>`;
+                
+                // ✅ ADDED: Google Maps Link for Pub Name
+                const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name + " " + p.address)}`;
+
+                li.innerHTML = `
+                    <div class="pub-details">
+                        <h3>${index+1}. <a href="${mapsLink}" target="_blank" class="pub-link">${p.name}</a></h3>
+                        <div class="pub-meta">${badges}<span class="distance-tag">📍 ${p.legDistance.toFixed(2)} km walk</span></div>
+                        <div class="pub-address">${p.address}</div>
+                    </div>
+                    <div style="font-size:20px;">🍺</div>`;
                 listEl.appendChild(li);
             });
 
@@ -282,7 +281,14 @@
                 warningEl.style.display = 'none';
             }
 
-            setTimeout(() => { map.invalidateSize(); if(latlngs.length>0) map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] }); }, 100);
+            // ✅ FIXED: Map Fit Bounds to ensure route is visible (not bird's eye)
+            setTimeout(() => { 
+                map.invalidateSize(); 
+                if(latlngs.length > 0) {
+                    const bounds = L.latLngBounds(latlngs);
+                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+                }
+            }, 200);
         }
 
         function getDist(lat1, lon1, lat2, lon2) {
@@ -300,6 +306,17 @@
             if (cats.includes('catering.bar')) tags.push('Bar');
             if (cats.includes('catering.restaurant')) tags.push('Restaurant');
             return [...new Set(tags)].map(t => `<span class="badge badge-type">${t}</span>`).join(' ');
+        }
+
+        // ✅ FIXED: Handle Logout globally
+        function handleLogout() {
+            if (window.firebase) {
+                firebase.auth().signOut().then(() => {
+                    window.location.href = "login.html";
+                });
+            } else {
+                console.error("Firebase not loaded");
+            }
         }
     </script>
 </body>
