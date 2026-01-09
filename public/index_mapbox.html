@@ -204,18 +204,25 @@ async function findPubs(centerLngLat) {
             document.getElementById('risk-analysis-container').innerHTML = ''; 
             window.insufficientPubs = null;
             
-            try {
+try {
                 // 1. Geocode Start
                 const startLoc = await geocodeLocation(location);
-                const center = startLoc.center; // [lng, lat]
+                const center = startLoc.center; 
                 
                 // 2. Find Pubs
                 let pubs = await findPubs(center);
+
+                // --- 🚨 NEW FIX: Check if pubs exist before continuing ---
+                if (!pubs || pubs.length === 0) {
+                    throw new Error("No pubs found nearby! Try a different location or increase search radius.");
+                }
+                // --------------------------------------------------------
                 
-                // 3. Calculate Distance from Center (Haversine)
+                // 3. Calculate Distance
                 pubs.forEach(p => {
                     p.distFromCenter = getDistanceFromLatLonInKm(center[1], center[0], p.lngLat[1], p.lngLat[0]) * 1000;
                 });
+
 
                 // Filter & Sort
                 if (sortPreference === 'circular') {
