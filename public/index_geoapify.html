@@ -13,11 +13,9 @@
         .logout-btn { background: #d93025; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); position: relative; }
         
-        /* Collapsible Search */
         .search-header-collapsed { display: none; justify-content: space-between; align-items: center; padding: 15px; background: #e8f0fe; border-radius: 8px; margin-bottom: 20px; cursor: pointer; border: 1px solid #dadce0; }
         .search-box { transition: all 0.3s ease; }
         .search-box.hidden { display: none; }
-        
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #555; }
         .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
@@ -26,7 +24,6 @@
         .btn-primary { background: #34a853; color: white; border: none; width: 100%; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .btn-primary:hover { background: #2d8e47; }
 
-        /* Results */
         #results-section { display: none; margin-top: 30px; }
         #map { height: 500px; width: 100%; border-radius: 8px; margin-bottom: 20px; z-index: 1; border: 1px solid #ddd; }
         .summary-box { background: #e6f4ea; border: 1px solid #ceead6; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #137333; }
@@ -34,11 +31,8 @@
         
         .pub-list { list-style: none; padding: 0; }
         .pub-item { background: white; border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 4px solid #34a853; display: flex; justify-content: space-between; align-items: center; }
-        
-        /* Links */
         .pub-link { text-decoration: none; color: #1a73e8; font-weight: bold; font-size: 16px; }
         .pub-link:hover { text-decoration: underline; color: #1557b0; }
-
         .pub-details h3 { margin: 0 0 5px 0; font-size: 16px; color: #333; }
         .pub-address { font-size: 13px; color: #666; }
         .pub-meta { font-size: 12px; margin-top: 5px; color: #888; display: flex; align-items: center; gap: 8px;}
@@ -55,7 +49,7 @@
         <div class="header-title"><span>🍺</span><span>Pub Crawl Planner (Geoapify)</span></div>
         <div id="user-profile" class="user-profile">
             <span>Hello, <strong id="user-name">User</strong></span>
-            <button class="logout-btn" onclick="handleLogout()">Logout</button>
+            <button class="logout-btn" onclick="signOut()">Logout</button>
         </div>
     </div>
 
@@ -100,17 +94,14 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    
     <script src="auth.js"></script>
 
     <script>
-        // 1. Init
         console.log("Geoapify Page Loaded");
         let map = null;
         let markersGroup = null;
         let routeLayer = null;
 
-        // 2. Auth Logic (Handled by auth.js mostly, but UI updates here)
         document.addEventListener('DOMContentLoaded', () => {
             if (window.firebase) {
                  firebase.auth().onAuthStateChanged((user) => {
@@ -123,7 +114,6 @@
             }
         });
 
-        // 3. UI Logic
         function toggleSearch() {
             const form = document.getElementById('search-box');
             const header = document.getElementById('search-header');
@@ -137,7 +127,6 @@
             }
         }
 
-        // 4. Map Logic
         function initMap() {
             if (map) return;
             map = L.map('map').setView([51.505, -0.09], 13);
@@ -148,10 +137,8 @@
             markersGroup = L.layerGroup().addTo(map);
         }
 
-        // 5. Search Logic
         document.getElementById('search-form').onsubmit = async (e) => {
             e.preventDefault();
-            
             const fd = new FormData(e.target);
             const location = fd.get('location');
             const numPubs = parseInt(fd.get('num-pubs'));
@@ -196,7 +183,7 @@
                     categories: f.properties.categories || []
                 })).filter(p => p.name !== "Unknown Venue");
 
-                // C. Route Logic
+                // C. Selection Logic
                 let currentLat = startCoords.lat;
                 let currentLon = startCoords.lon;
                 let route = [];
@@ -207,15 +194,13 @@
                 for (let i = 0; i < numPubs; i++) {
                     if (remaining.length === 0) { stopReason = 'no_more_pubs'; break; }
                     remaining.sort((a,b) => getDist(currentLat, currentLon, a.lat, a.lon) - getDist(currentLat, currentLon, b.lat, b.lon));
-                    
                     const next = remaining.shift();
                     const legDist = getDist(currentLat, currentLon, next.lat, next.lon);
-
+                    
                     if (currentTotalDist + legDist > (maxDistanceMeters / 1000)) {
                         stopReason = 'distance_limit';
                         break;
                     }
-
                     next.legDistance = legDist;
                     route.push(next);
                     currentTotalDist += legDist;
@@ -223,7 +208,31 @@
                     currentLon = next.lon;
                 }
 
-                renderResults(route, startCoords, currentTotalDist, stopReason, numPubs);
+                // D. ROUTING (New: Get Real Path Geometry)
+                let routeGeometry = null;
+                if (route.length > 0) {
+                    // Create waypoints: "Start|Pub1|Pub2..."
+                    const waypoints = [`${startCoords.lat},${startCoords.lon}`, ...route.map(p => `${p.lat},${p.lon}`)].join('|');
+                    
+                    const routeRes = await fetch('/api/geoapify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: 'routing', waypoints: waypoints })
+                    });
+                    
+                    if (routeRes.ok) {
+                        const routeData = await routeRes.json();
+                        if (routeData.features && routeData.features.length > 0) {
+                            // GeoJSON format is [lon, lat], Leaflet needs [lat, lon]
+                            routeGeometry = routeData.features[0].geometry.coordinates.map(coordArray => {
+                                return coordArray.map(c => [c[1], c[0]]); // Swap to Lat,Lon
+                            }).flat(); // Flatten segments
+                        }
+                    }
+                }
+
+                renderResults(route, startCoords, currentTotalDist, stopReason, numPubs, routeGeometry);
+                
                 document.getElementById('search-box').classList.add('hidden');
                 document.getElementById('search-header').style.display = 'flex';
                 document.getElementById('summary-text').innerText = `${route.length} pubs near ${location}`;
@@ -236,56 +245,52 @@
             }
         };
 
-        function renderResults(pubs, startLocation, totalDist, stopReason, requestedStops) {
+        function renderResults(pubs, startLocation, totalDist, stopReason, requestedStops, routeGeometry) {
             document.getElementById('results-section').style.display = 'block';
             initMap();
             markersGroup.clearLayers();
             if (routeLayer) map.removeLayer(routeLayer);
 
-            // Add Start Marker
+            // Markers
             L.marker([startLocation.lat, startLocation.lon]).bindPopup(`<strong>Start:</strong> ${startLocation.formatted}`).addTo(markersGroup);
+            
+            // Used for bounds
+            let pointsForBounds = [[startLocation.lat, startLocation.lon]]; 
 
-            const latlngs = [[startLocation.lat, startLocation.lon]];
             const listEl = document.getElementById('pub-list');
             listEl.innerHTML = '';
 
             pubs.forEach((p, index) => {
-                latlngs.push([p.lat, p.lon]);
+                pointsForBounds.push([p.lat, p.lon]);
                 L.marker([p.lat, p.lon]).bindPopup(`<strong>${index+1}. ${p.name}</strong><br>${p.address}`).addTo(markersGroup);
                 
                 const badges = formatCategories(p.categories);
+                const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name + " " + p.address)}`;
                 const li = document.createElement('li');
                 li.className = 'pub-item';
-                
-                // ✅ ADDED: Google Maps Link for Pub Name
-                const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name + " " + p.address)}`;
-
-                li.innerHTML = `
-                    <div class="pub-details">
-                        <h3>${index+1}. <a href="${mapsLink}" target="_blank" class="pub-link">${p.name}</a></h3>
-                        <div class="pub-meta">${badges}<span class="distance-tag">📍 ${p.legDistance.toFixed(2)} km walk</span></div>
-                        <div class="pub-address">${p.address}</div>
-                    </div>
-                    <div style="font-size:20px;">🍺</div>`;
+                li.innerHTML = `<div class="pub-details"><h3>${index+1}. <a href="${mapsLink}" target="_blank" class="pub-link">${p.name}</a></h3><div class="pub-meta">${badges}<span class="distance-tag">📍 ${p.legDistance.toFixed(2)} km walk</span></div><div class="pub-address">${p.address}</div></div><div style="font-size:20px;">🍺</div>`;
                 listEl.appendChild(li);
             });
 
-            routeLayer = L.polyline(latlngs, { color: '#34a853', weight: 4 }).addTo(map);
-            document.getElementById('route-stats').innerHTML = `<strong>${pubs.length} Stops</strong> • ${totalDist.toFixed(2)} km total walking`;
-
-            const warningEl = document.getElementById('limit-warning');
-            if (stopReason === 'distance_limit') {
-                warningEl.style.display = 'block';
-                warningEl.innerHTML = `⚠️ <strong>Route Shortened:</strong> We stopped at ${pubs.length} pubs. Adding more would exceed your limit.`;
+            // Draw Route (Real path if available, else straight lines)
+            if (routeGeometry) {
+                routeLayer = L.polyline(routeGeometry, { color: '#34a853', weight: 5, opacity: 0.8 }).addTo(map);
             } else {
-                warningEl.style.display = 'none';
+                // Fallback to straight lines
+                routeLayer = L.polyline(pointsForBounds, { color: '#34a853', weight: 4, dashArray: '10, 10' }).addTo(map);
             }
 
-            // ✅ FIXED: Map Fit Bounds to ensure route is visible (not bird's eye)
+            document.getElementById('route-stats').innerHTML = `<strong>${pubs.length} Stops</strong> • ~${totalDist.toFixed(2)} km total walking`;
+
+            const warningEl = document.getElementById('limit-warning');
+            warningEl.style.display = stopReason === 'distance_limit' ? 'block' : 'none';
+            if(stopReason === 'distance_limit') warningEl.innerHTML = `⚠️ <strong>Route Shortened:</strong> We stopped at ${pubs.length} pubs to stay within your distance limit.`;
+
+            // Fit Bounds
             setTimeout(() => { 
                 map.invalidateSize(); 
-                if(latlngs.length > 0) {
-                    const bounds = L.latLngBounds(latlngs);
+                if(pointsForBounds.length > 0) {
+                    const bounds = L.latLngBounds(pointsForBounds);
                     map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
                 }
             }, 200);
@@ -306,17 +311,6 @@
             if (cats.includes('catering.bar')) tags.push('Bar');
             if (cats.includes('catering.restaurant')) tags.push('Restaurant');
             return [...new Set(tags)].map(t => `<span class="badge badge-type">${t}</span>`).join(' ');
-        }
-
-        // ✅ FIXED: Handle Logout globally
-        function handleLogout() {
-            if (window.firebase) {
-                firebase.auth().signOut().then(() => {
-                    window.location.href = "login.html";
-                });
-            } else {
-                console.error("Firebase not loaded");
-            }
         }
     </script>
 </body>
