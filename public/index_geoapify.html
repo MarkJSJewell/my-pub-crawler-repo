@@ -27,11 +27,24 @@
             border-radius: 4px; cursor: pointer; font-size: 12px; 
         }
 
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); position: relative; }
         
-        /* Search Form */
-        .search-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef; }
-        .search-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        /* Collapsible Search Form */
+        .search-header-collapsed { 
+            display: none; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 15px; 
+            background: #e8f0fe; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            cursor: pointer; 
+            border: 1px solid #dadce0;
+        }
+        
+        .search-box { transition: all 0.3s ease; }
+        .search-box.hidden { display: none; }
+
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #555; }
         .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
@@ -48,9 +61,10 @@
 
         /* Results */
         #results-section { display: none; margin-top: 30px; }
-        #map { height: 400px; width: 100%; border-radius: 8px; margin-bottom: 20px; z-index: 1; }
+        #map { height: 500px; width: 100%; border-radius: 8px; margin-bottom: 20px; z-index: 1; border: 1px solid #ddd; }
         
         .summary-box { background: #e6f4ea; border: 1px solid #ceead6; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #137333; }
+        .warning-box { background: #fef7e0; border-left: 4px solid #fbbc04; padding: 10px; margin-top: 10px; font-size: 13px; color: #856404; display: none; border-radius: 4px; }
         
         .pub-list { list-style: none; padding: 0; }
         .pub-item { 
@@ -87,14 +101,20 @@
     </div>
 
     <div class="container">
-        <div class="search-box" id="search-box">
-            <div class="search-header">
-                <h3>🔍 Route Criteria</h3>
+        
+        <div id="search-header" class="search-header-collapsed" onclick="toggleSearch()">
+            <div>
+                <strong>🔍 Route:</strong> <span id="summary-text" style="color:#5f6368;">Edit your criteria</span>
             </div>
+            <button style="background:none; border:none; color:#1a73e8; font-weight:600; cursor:pointer;">Edit</button>
+        </div>
+
+        <div class="search-box" id="search-box">
+            <h3 style="margin-top:0;">🔍 Route Criteria</h3>
             <form id="search-form">
                 <div class="form-group">
                     <label>Start Location</label>
-                    <input type="text" class="form-control" name="location" placeholder="e.g. Paddington Station, London" required>
+                    <input type="text" class="form-control" name="location" id="location-input" placeholder="e.g. Paddington Station, London" required>
                 </div>
                 
                 <div class="row">
@@ -106,7 +126,8 @@
                                 <option value="5" selected>5 stops</option>
                                 <option value="8">8 stops</option>
                                 <option value="10">10 stops</option>
-                                <option value="20">20 stops</option> </select>
+                                <option value="20">20 stops</option>
+                            </select>
                         </div>
                     </div>
                     <div class="col">
@@ -121,11 +142,15 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Max Distance (Total Walk)</label> <select class="form-control" name="max-distance">
+                    <label>Max Distance (Total Walk)</label>
+                    <select class="form-control" name="max-distance">
                         <option value="3000">3 km</option>
                         <option value="5000" selected>5 km</option>
                         <option value="10000">10 km</option>
-                        <option value="15000">15 km</option> <option value="20000">20 km</option> <option value="50000">50 km</option> </select>
+                        <option value="15000">15 km</option>
+                        <option value="20000">20 km</option>
+                        <option value="50000">50 km</option>
+                    </select>
                 </div>
 
                 <button type="submit" class="btn-primary">Find Route</button>
@@ -140,6 +165,7 @@
             <div class="summary-box">
                 <h3 style="margin:0 0 5px 0;">Route Overview</h3>
                 <div id="route-stats">Calculating...</div>
+                <div id="limit-warning" class="warning-box"></div>
                 <div style="font-size:12px; margin-top:5px; color:#555;">
                     <i>Note: Data provided by Geoapify/OpenStreetMap. Ratings not available in free tier.</i>
                 </div>
@@ -150,33 +176,43 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="auth.js"></script>
 
     <script>
         // --- 1. CONFIGURATION ---
-        // ⚠️ PASTE YOUR GEOAPIFY KEY HERE FOR TILES TO LOAD
-        const GEOAPIFY_KEY = '7d8a9f0223944738804008779e955350'; 
-
+        // Note: For tiles, we are switching to OSM (Free) to fix the gray background issue immediately
+        
         let map = null;
         let markersGroup = null;
         let routeLayer = null;
 
-        // --- 2. AUTHENTICATION LOGIC ---
+        // --- 2. UI LOGIC ---
+        function toggleSearch() {
+            const form = document.getElementById('search-box');
+            const header = document.getElementById('search-header');
+            
+            if (form.classList.contains('hidden')) {
+                // Show Form
+                form.classList.remove('hidden');
+                header.style.display = 'none';
+                document.getElementById('results-section').style.display = 'none';
+            } else {
+                // Hide Form (Only called by code after search)
+                form.classList.add('hidden');
+                header.style.display = 'flex';
+            }
+        }
+
+        // --- 3. AUTHENTICATION LOGIC ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Check Firebase Auth State
             if (window.firebase) {
                 firebase.auth().onAuthStateChanged((user) => {
                     if (user) {
                         const name = user.email.split('@')[0];
                         document.getElementById('user-name').innerText = name;
                         document.getElementById('user-profile').style.display = 'flex';
-                    } else {
-                        // Optional: Redirect to login if you want this page protected
-                        // window.location.href = "login.html";
-                        document.getElementById('user-profile').style.display = 'none';
                     }
                 });
             }
@@ -190,50 +226,49 @@
             }
         }
 
-        // --- 3. MAP LOGIC ---
+        // --- 4. MAP LOGIC ---
         function initMap() {
             if (map) return;
             
-            // Default center (London) - will move on search
+            // Initialize Leaflet
             map = L.map('map').setView([51.505, -0.09], 13);
 
-            // Geoapify Tile Layer (Needs Key)
-            L.tileLayer(`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_KEY}`, {
-                attribution: 'Powered by Geoapify | © OpenStreetMap',
-                maxZoom: 20
+            // FIX: Use OpenStreetMap Tiles (Standard, Free, No Key Required)
+            // This guarantees the map loads and fixes the gray background issue
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
             }).addTo(map);
 
             markersGroup = L.layerGroup().addTo(map);
         }
 
-        // --- 4. SEARCH LOGIC ---
+        // --- 5. SEARCH LOGIC ---
         document.getElementById('search-form').onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(e.target);
             const location = fd.get('location');
             const numPubs = parseInt(fd.get('num-pubs'));
-            const maxRadius = parseInt(fd.get('max-distance')) / 2; // Rough radius calc
-            const strategy = fd.get('strategy');
+            const maxDistanceMeters = parseInt(fd.get('max-distance')); // User's strict limit
+            // Search radius can be wider than walk limit to find options
+            const searchRadius = Math.max(2000, maxDistanceMeters / 2); 
 
             document.getElementById('loader').style.display = 'block';
             document.getElementById('results-section').style.display = 'none';
 
             try {
-                // A. Geocode Start Location (Using Backend Proxy)
+                // A. Geocode
                 const geoRes = await fetch('/api/geoapify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        type: 'geocode', 
-                        text: location 
-                    })
+                    body: JSON.stringify({ type: 'geocode', text: location })
                 });
                 const geoData = await geoRes.json();
                 
                 if (!geoData.features || geoData.features.length === 0) throw new Error("Location not found");
                 const startCoords = geoData.features[0].properties; // { lat, lon }
 
-                // B. Find Pubs (Using Backend Proxy)
+                // B. Find Pubs
                 const placesRes = await fetch('/api/geoapify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -241,13 +276,13 @@
                         type: 'places', 
                         lat: startCoords.lat, 
                         lon: startCoords.lon,
-                        radius: maxRadius,
+                        radius: searchRadius,
                         categories: 'catering.pub,catering.bar'
                     })
                 });
                 const placesData = await placesRes.json();
                 
-                // C. Client-Side Sorting/Routing
+                // C. Process Data
                 let pubs = placesData.features.map(f => ({
                     name: f.properties.name || "Unknown Venue",
                     address: f.properties.address_line2 || f.properties.formatted,
@@ -256,16 +291,18 @@
                     categories: f.properties.categories || []
                 })).filter(p => p.name !== "Unknown Venue");
 
-                // Simple routing: Sort by distance from current point
+                // D. Routing Logic with DISTANCE CAP
                 let currentLat = startCoords.lat;
                 let currentLon = startCoords.lon;
                 let route = [];
                 let remaining = [...pubs];
+                let currentTotalDist = 0;
+                let stopReason = 'target_reached'; // or 'distance_limit'
 
                 for (let i = 0; i < numPubs; i++) {
-                    if (remaining.length === 0) break;
+                    if (remaining.length === 0) { stopReason = 'no_more_pubs'; break; }
                     
-                    // Find nearest to current point
+                    // Find nearest
                     remaining.sort((a,b) => {
                         const distA = getDist(currentLat, currentLon, a.lat, a.lon);
                         const distB = getDist(currentLat, currentLon, b.lat, b.lon);
@@ -273,18 +310,28 @@
                     });
 
                     const next = remaining.shift();
-                    
-                    // Calculate leg distance for UI
-                    next.legDistance = getDist(currentLat, currentLon, next.lat, next.lon);
-                    
+                    const legDist = getDist(currentLat, currentLon, next.lat, next.lon);
+
+                    // 🛑 CHECK: Does this exceed the user's max distance?
+                    if (currentTotalDist + legDist > (maxDistanceMeters / 1000)) {
+                        stopReason = 'distance_limit';
+                        break; // Stop adding pubs!
+                    }
+
+                    next.legDistance = legDist;
                     route.push(next);
+                    currentTotalDist += legDist;
+                    
                     currentLat = next.lat;
                     currentLon = next.lon;
                 }
 
-                // If circular, add logic here (omitted for brevity in this snippet)
-
-                renderResults(route, startCoords);
+                renderResults(route, startCoords, currentTotalDist, stopReason, numPubs);
+                
+                // Collapse the form
+                document.getElementById('search-box').classList.add('hidden');
+                document.getElementById('search-header').style.display = 'flex';
+                document.getElementById('summary-text').innerText = `${route.length} pubs near ${location}`;
 
             } catch (err) {
                 alert("Error: " + err.message);
@@ -294,42 +341,33 @@
             }
         };
 
-        function renderResults(pubs, startLocation) {
+        function renderResults(pubs, startLocation, totalDist, stopReason, requestedStops) {
             document.getElementById('results-section').style.display = 'block';
             initMap();
             
-            // 1. Clear Map
+            // Clear & Draw
             markersGroup.clearLayers();
             if (routeLayer) map.removeLayer(routeLayer);
 
-            // 2. Add Start Marker
-            const startMarker = L.marker([startLocation.lat, startLocation.lon])
+            // Start Marker
+            L.marker([startLocation.lat, startLocation.lon])
                 .bindPopup(`<strong>Start:</strong> ${startLocation.formatted}`)
                 .addTo(markersGroup);
 
-            // 3. Add Pub Markers & Path
             const latlngs = [[startLocation.lat, startLocation.lon]];
-            let totalDist = 0;
-
             const listEl = document.getElementById('pub-list');
             listEl.innerHTML = '';
 
             pubs.forEach((p, index) => {
                 latlngs.push([p.lat, p.lon]);
-                totalDist += p.legDistance;
 
-                // Marker
                 L.marker([p.lat, p.lon])
                     .bindPopup(`<strong>${index+1}. ${p.name}</strong><br>${p.address}`)
                     .addTo(markersGroup);
 
-                // List Item
+                const badges = formatCategories(p.categories);
                 const li = document.createElement('li');
                 li.className = 'pub-item';
-                
-                // Format Venue Type
-                const badges = formatCategories(p.categories);
-                
                 li.innerHTML = `
                     <div class="pub-details">
                         <h3>${index+1}. ${p.name}</h3>
@@ -344,25 +382,33 @@
                 listEl.appendChild(li);
             });
 
-            // 4. Draw Polyline
+            // Draw Route
             routeLayer = L.polyline(latlngs, { color: '#34a853', weight: 4 }).addTo(map);
 
-            // 5. Update Stats
+            // Stats & Warnings
             document.getElementById('route-stats').innerHTML = `
-                <strong>${pubs.length} Stops</strong> • ${totalDist.toFixed(1)} km total walking
+                <strong>${pubs.length} Stops</strong> • ${totalDist.toFixed(2)} km total walking
             `;
 
-            // 6. Fix Map Sizing (The "Second Search" Bug Fix)
-            // We must invalidate size because the map div was previously hidden (display:none)
+            const warningEl = document.getElementById('limit-warning');
+            if (stopReason === 'distance_limit') {
+                warningEl.style.display = 'block';
+                warningEl.innerHTML = `⚠️ <strong>Route Shortened:</strong> We stopped at ${pubs.length} pubs (you asked for ${requestedStops}). Adding the next pub would have exceeded your max distance limit of ${(document.querySelector('[name="max-distance"]').value/1000)}km.`;
+            } else {
+                warningEl.style.display = 'none';
+            }
+
+            // Fix Map Size
             setTimeout(() => {
                 map.invalidateSize();
-                const bounds = L.latLngBounds(latlngs);
-                map.fitBounds(bounds, { padding: [50, 50] });
+                if (latlngs.length > 0) {
+                    const bounds = L.latLngBounds(latlngs);
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
             }, 100);
         }
 
         // --- Helpers ---
-        
         function getDist(lat1, lon1, lat2, lon2) {
             const R = 6371; // km
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -370,22 +416,4 @@
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                     Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
-        }
-
-        function formatCategories(cats) {
-            if (!cats) return '';
-            const tags = [];
-            if (cats.includes('catering.pub')) tags.push('Pub');
-            if (cats.includes('catering.bar')) tags.push('Bar');
-            if (cats.includes('catering.restaurant')) tags.push('Restaurant');
-            if (cats.includes('catering.biergarten')) tags.push('Beer Garden');
-            
-            // Dedupe and create badges
-            return [...new Set(tags)].map(t => `<span class="badge badge-type">${t}</span>`).join(' ');
-        }
-
-    </script>
-</body>
-</html>
+            const c = 2 * Math.atan2(Math.
