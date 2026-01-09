@@ -1,4 +1,4 @@
-// auth.js
+// public/auth.js
 
 const firebaseConfig = {
     apiKey: "AIzaSyDllyjsS-uJ5ldC95xo8QQuyu9eNwm5i8U",
@@ -9,25 +9,21 @@ const firebaseConfig = {
     appId: "1:366467560298:web:390fda941dabefe1d3eb13"
 };
 
-// Initialize Firebase
+// 1. Initialize Firebase
 try {
     firebase.initializeApp(firebaseConfig);
     
-    // [CRITICAL] Check if appCheck exists before calling (prevents crash if script missing)
+    // Initialize App Check if available
     if (firebase.appCheck) {
         const appCheck = firebase.appCheck();
         appCheck.activate('6Ld_OCgsAAAAAAgEbt4nOW6wuO0cJKI9bEo80fae', true);
         console.log('Firebase App Check initialized');
-    } else {
-        console.warn('Firebase App Check script not loaded - skipping initialization');
     }
 } catch (e) {
     console.error('Firebase Initialization Error:', e);
 }
 
-const BACKEND_URL = 'https://pub-crawler-backend.vercel.app/api';
-
-// Global Login Function
+// 2. Global Login/Logout Functions
 window.loginWithGoogle = function() {
     const provider = new firebase.auth.GoogleAuthProvider();
     firebase.auth().signInWithPopup(provider)
@@ -44,55 +40,38 @@ window.signOut = function() {
     firebase.auth().signOut().then(() => window.location.href = 'login.html');
 };
 
-// Auth State Observer
+// 3. Auth State Observer (The "Gatekeeper")
 firebase.auth().onAuthStateChanged((user) => {
-    // Redirect logic
-    const isLoginPage = window.location.pathname.includes('login.html');
-    
-    if (user) {
-        if (isLoginPage) window.location.href = 'index.html';
-        
-        // If on index page, update UI
-        const emailDisplay = document.getElementById('user-email');
-        if (emailDisplay) emailDisplay.textContent = user.email.split('@')[0];
-        
-        const displayDiv = document.getElementById('user-display');
-        if (displayDiv) displayDiv.style.display = 'block';
+    const path = window.location.pathname;
+    const isLoginPage = path.includes('login.html');
 
-        if (typeof initializeApp === 'function') initializeApp();
+    if (user) {
+        // ✅ USER IS LOGGED IN
+        
+        // If they are on the login page, send them to the main menu
+        if (isLoginPage) {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        // Update UI logic (Matches your new index.html)
+        const nameDisplay = document.getElementById('user-name');
+        if (nameDisplay) nameDisplay.innerText = user.email.split('@')[0];
+
+        const profileDiv = document.getElementById('user-profile');
+        if (profileDiv) profileDiv.style.opacity = '1';
+
+        const contentDiv = document.getElementById('main-content');
+        if (contentDiv) contentDiv.style.display = 'block';
+
     } else {
-        if (!isLoginPage && !window.location.pathname.endsWith('/')) {
-             window.location.href = 'login.html';
+        // ❌ USER IS LOGGED OUT
+        
+        // If they are NOT on the login page, kick them out
+        // (This protects index.html, index_google.html, etc.)
+        if (!isLoginPage) {
+            console.log("Unauthorized access. Redirecting to login...");
+            window.location.href = 'login.html';
         }
     }
 });
-
-// Main App Init (Only runs on index.html)
-async function initializeApp() {
-    if (window.googleMapsLoaded) return;
-    try {
-        const user = firebase.auth().currentUser;
-        if (!user) return; // Should be caught by auth observer, but safety first
-        
-        const token = await user.getIdToken();
-        const response = await fetch(`${BACKEND_URL}/get-api-key`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        const data = await response.json();
-        
-        if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${data.apiKey}&libraries=places,geometry&callback=initGoogleMapsCallback`;
-            script.async = true;
-            document.head.appendChild(script);
-        }
-        
-        const status = document.getElementById('api-status');
-        if(status) status.innerHTML = '<span style="color:#34a853;">✓ Connected</span>';
-    } catch (e) {
-        console.error(e);
-        const status = document.getElementById('api-status');
-        if(status) status.innerHTML = '<span style="color:#ea4335;">⚠ Connection Error</span>';
-    }
-}
