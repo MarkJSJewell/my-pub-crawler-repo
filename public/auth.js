@@ -1,7 +1,7 @@
 // public/auth.js
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDllyjsS-uJ5ldC95xo8QQuyu9eNwm5i8U",
+    apiKey: "AIzaSyBLcBJkaPA7LoFXtLCGYqMDr61qQtzTcMk",
     authDomain: "pub-crawler-backend.firebaseapp.com",
     projectId: "pub-crawler-backend",
     storageBucket: "pub-crawler-backend.firebasestorage.app",
