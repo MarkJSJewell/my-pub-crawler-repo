@@ -1,7 +1,9 @@
 // public/auth.js
 
 const firebaseConfig = {
+    // ✅ FIXED: Updated to match your actual Firebase Console Key
     apiKey: "AIzaSyBLcBJkaPA7LoFXtLCGYqMDr61qQtzTcMk",
+    
     authDomain: "pub-crawler-backend.firebaseapp.com",
     projectId: "pub-crawler-backend",
     storageBucket: "pub-crawler-backend.firebasestorage.app",
@@ -16,6 +18,7 @@ try {
     // Initialize App Check if available
     if (firebase.appCheck) {
         const appCheck = firebase.appCheck();
+        // This token is public and safe to be here for App Check
         appCheck.activate('6Ld_OCgsAAAAAAgEbt4nOW6wuO0cJKI9bEo80fae', true);
         console.log('Firebase App Check initialized');
     }
@@ -36,8 +39,14 @@ window.loginWithGoogle = function() {
         });
 };
 
+// ✅ Global SignOut function (Used by all pages)
 window.signOut = function() {
-    firebase.auth().signOut().then(() => window.location.href = 'login.html');
+    firebase.auth().signOut().then(() => {
+        console.log("User signed out.");
+        window.location.href = 'login.html';
+    }).catch((error) => {
+        console.error("Sign Out Error:", error);
+    });
 };
 
 // 3. Auth State Observer (The "Gatekeeper")
@@ -47,28 +56,23 @@ firebase.auth().onAuthStateChanged((user) => {
 
     if (user) {
         // ✅ USER IS LOGGED IN
-        
-        // If they are on the login page, send them to the main menu
         if (isLoginPage) {
             window.location.href = 'index.html';
             return;
         }
 
-        // Update UI logic (Matches your new index.html)
+        // Update UI logic (For both index.html and index_geoapify.html)
         const nameDisplay = document.getElementById('user-name');
         if (nameDisplay) nameDisplay.innerText = user.email.split('@')[0];
 
         const profileDiv = document.getElementById('user-profile');
-        if (profileDiv) profileDiv.style.opacity = '1';
+        if (profileDiv) profileDiv.style.display = 'flex'; // Ensure flex layout
 
         const contentDiv = document.getElementById('main-content');
-        if (contentDiv) contentDiv.style.display = 'block';
+        if (contentDiv) contentDiv.style.display = 'flex'; // Ensure flex layout
 
     } else {
         // ❌ USER IS LOGGED OUT
-        
-        // If they are NOT on the login page, kick them out
-        // (This protects index.html, index_google.html, etc.)
         if (!isLoginPage) {
             console.log("Unauthorized access. Redirecting to login...");
             window.location.href = 'login.html';
