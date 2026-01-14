@@ -2,7 +2,7 @@
 
 const firebaseConfig = {
     // ✅ FIXED: Updated to match your actual Firebase Console Key
-    apiKey: "AIzaSyBLcBJkaPA7LoFXtLCGYqMDr61qQtzTcMk",
+    apiKey: "AIzaSyDllyjsS-uJ5ldC95xo8QQuyu9eNwm5i8U",
     
     authDomain: "pub-crawler-backend.firebaseapp.com",
     projectId: "pub-crawler-backend",
